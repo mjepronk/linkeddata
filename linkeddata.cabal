@@ -1,0 +1,94 @@
+name:           linkeddata
+version:        0.0.1.0
+synopsis:       Linked Data for Haskell
+description:    Please see the README on Github at <https://github.com/mjepronk/linkeddata#readme>
+homepage:       https://github.com/mjepronk/linkeddata#readme
+bug-reports:    https://github.com/mjepronk/linkeddata/issues
+author:         Matthias Pronk
+maintainer:     matthiasNOSPAM@remakingthe.world
+copyright:      (c) Matthias Pronk
+license:        BSD3
+license-file:   LICENSE
+build-type:     Simple
+cabal-version:  >= 1.10
+
+extra-source-files:
+    ChangeLog.md
+    README.md
+
+source-repository head
+  type: git
+  location: https://github.com/mjepronk/linkeddata
+
+library
+  hs-source-dirs:
+      src
+  build-depends:
+      base >=4.7 && <5
+    , binary
+    , bytestring
+    , containers
+    , exceptions
+    , hashable
+    , megaparsec
+    , modern-uri
+    , mtl
+    , parser-combinators
+    , path
+    , text
+    , transformers
+  exposed-modules:
+      Data.LinkedData
+      Data.LinkedData.Graphs
+      Data.LinkedData.IRI
+      Data.LinkedData.Query
+      Data.LinkedData.Serialisation.NTriplesParser
+      Data.LinkedData.Serialisation.TurtleParser
+      Data.LinkedData.Types
+      Data.LinkedData.Utils
+  default-language: Haskell2010
+  ghc-options: -Wall
+
+-- executable linkeddata-exe
+--   main-is: Main.hs
+--   hs-source-dirs:
+--       app
+--   ghc-options: -threaded -rtsopts -with-rtsopts=-N
+--   build-depends:
+--       base >=4.7 && <5
+--     , linkeddata
+--   default-language: Haskell2010
+
+test-suite linkeddata-test
+  type: exitcode-stdio-1.0
+  main-is: Spec.hs
+  other-modules:
+      Data.LinkedData.PropertyTests
+  hs-source-dirs:
+      test
+  ghc-options: -threaded -rtsopts -with-rtsopts=-N
+  build-depends:
+      base >=4.7 && <5
+    , hspec
+    , linkeddata
+    , modern-uri
+    , path
+    , QuickCheck
+    , text
+  default-language: Haskell2010
+
+-- benchmark linkeddata-bench
+--   main-is:             Main.hs
+--   hs-source-dirs:      bench/speed
+--   type:                exitcode-stdio-1.0
+--   build-depends:       base             >= 4.7 && < 5.0
+--                      , bytestring       >= 0.2 && < 0.11
+--                      , criterion        >= 0.6.2.1 && < 1.3
+--                      , linkeddata
+--                      , megaparsec       >= 6.0 && < 7.0
+--                      , text             >= 0.2  && < 1.3
+--   if flag(dev)
+--     ghc-options:       -Wall -Werror
+--   else
+--     ghc-options:       -Wall
+--   default-language:    Haskell2010
