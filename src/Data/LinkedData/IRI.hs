@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Data.LinkedData.IRI where
 
 import           Data.Maybe (fromJust)
@@ -7,33 +9,36 @@ import qualified Data.Text as T
 import qualified Text.URI as URI
 
 
--- | Construct IRI term from (expanded) prefix and IRI.
-iterm :: IRI -> IRI -> Term
-iterm a b =
-    case appendIRI a b of
-      Just (IRI i) -> ITerm i
-      Nothing -> iriToTerm b
+(#) :: IRI -> T.Text -> IRI
+b # r = (IRI r) `unsafeRelativeTo` b
 
-unIRI :: IRI -> T.Text
-unIRI (IRI iri) = iri
+-- TODO: implement this properly
+relativeTo :: IRI -> IRI -> Maybe IRI
+relativeTo ref@(IRI r) (IRI b) = do
+   isAbs <- isAbsoluteIRI ref
+   if isAbs
+    then pure ref
+    else pure $ IRI (b <> r)
 
-iriToTerm :: IRI -> Term
-iriToTerm (IRI i) = ITerm i
+-- Unsafe version of 'relativeTo'. Only use with hardcoded reference and base
+-- IRI's that you are sure will not cause exceptions.
+unsafeRelativeTo :: IRI -> IRI -> IRI
+unsafeRelativeTo r b = fromJust $ r `relativeTo` b
 
-appendIRI :: IRI -> IRI -> Maybe IRI
-appendIRI (IRI a) b'@(IRI b) = do
-   b'' <- isAbsoluteIRI b'
-   if b''
-    then pure b'
-    else pure $ IRI (a <> b)
+-- TODO: implement this properly
+relativeFrom :: IRI -> IRI -> Maybe IRI
+relativeFrom (IRI r) (IRI b)
+  | b `T.isPrefixOf` r = Just . IRI $ T.drop (T.length b) r
+  | otherwise          = Nothing
 
-unsafeAppendIRI :: IRI -> IRI -> IRI
-unsafeAppendIRI a b = fromJust $ appendIRI a b
+isBaseIRIOf :: IRI -> IRI -> Bool
+isBaseIRIOf (IRI b) (IRI r) = b `T.isPrefixOf` r
 
 isAbsoluteIRI :: IRI -> Maybe Bool
 isAbsoluteIRI (IRI i) = do
     u <- URI.mkURI i
     pure (URI.isPathAbsolute u)
 
-uriToIRI :: URI.URI -> IRI
-uriToIRI u = IRI (URI.render u)
+-- | TODO: replace this with lenses?
+unIRI :: IRI -> T.Text
+unIRI (IRI iri) = iri

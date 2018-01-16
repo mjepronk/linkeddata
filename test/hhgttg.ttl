@@ -1,0 +1,17 @@
+@base <http://example.com/h2g2/> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix foaf: <http://xmlns.com/foaf/0.1/> .
+
+<Arthur+Dent> a foaf:Person ;
+    foaf:knows <Ford+Prefect>, <Tricia+McMillan> ;
+    foaf:gender "male" ;
+    foaf:familyName "Dent" ;
+    foaf:givenName "Arthur" ;
+    foaf:name "Arthur Dent" .
+
+<Ford+Prefect> a foaf:Person ;
+    foaf:name "Ford Prefect" .
+
+<Tricia+McMillan> a foaf:Person ;
+    foaf:name "Tricia McMillan" ;
+    foaf:nick "Trillian" .

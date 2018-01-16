@@ -35,16 +35,20 @@ library
     , mtl
     , parser-combinators
     , path
+    , safe
     , text
     , transformers
   exposed-modules:
       Data.LinkedData
+      Data.LinkedData.Types
+  other-modules:
       Data.LinkedData.Graphs
       Data.LinkedData.IRI
       Data.LinkedData.Query
       Data.LinkedData.Serialisation.NTriplesParser
+      Data.LinkedData.Serialisation.NTriplesSerialiser
       Data.LinkedData.Serialisation.TurtleParser
-      Data.LinkedData.Types
+      Data.LinkedData.Serialisation.TurtleSerialiser
       Data.LinkedData.Utils
   default-language: Haskell2010
   ghc-options: -Wall

@@ -3,14 +3,17 @@
 -- See:
 -- - https://www.w3.org/TR/turtle/#sec-grammar-grammar
 --
-
 -- TODO:
 -- - addTriple / getTriple: use datastructure that supports cheap appends
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
 
-module Data.LinkedData.Serialisation.TurtleParser where
+module Data.LinkedData.Serialisation.TurtleParser
+  ( parseTurtle
+  , parseTurtleFile
+  )
+where
 
 import           Data.Maybe (Maybe(..))
 import           Data.Char (digitToInt, chr, isDigit, isAsciiLower, isAsciiUpper)
@@ -26,18 +29,23 @@ import qualified Data.Text as T
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TL
 import qualified Data.Map.Strict as M
-import           Text.Megaparsec ((<?>), ParsecT, ParseError(..), runParserT, try,
-                     customFailure, takeWhileP, takeWhile1P, eof, notFollowedBy, label)
-import           Text.Megaparsec.Char (char, hexDigitChar, oneOf, string, string')
+import           Text.Megaparsec ((<?>), ParsecT, ParseError(..), runParserT,
+                     try, customFailure, takeWhileP, takeWhile1P, eof,
+                     notFollowedBy)
+import           Text.Megaparsec.Char (char, hexDigitChar, oneOf, string, string', satisfy)
 import           Data.LinkedData.Types
-import           Data.LinkedData.IRI as LD
+import           Data.LinkedData.IRI ((#))
+import qualified Data.LinkedData.IRI as LD
+import           Path (Path, File, toFilePath)
 
 
 type TurtleParser = ParsecT T.Text TL.Text (State ParserState)
 
 -- | Parsing state for the Turtle parser.
+--
 -- See:
 -- - https://www.w3.org/TR/turtle/#sec-grammar-grammar#h3_sec-parsing-state
+
 data ParserState = ParserState
        { stBase         :: Maybe IRI
        , stNamespaces   :: M.Map Prefix IRI
@@ -58,15 +66,18 @@ initialParserState = ParserState
       , stTriples      = []
       }
 
-parseTurtle :: FilePath -> TL.Text -> Either (ParseError Char T.Text) Graph
+
+parseTurtle :: (Maybe (Path a File)) -> TL.Text -> Either (ParseError Char T.Text) Graph
 parseTurtle fp t =
-    case runState (runParserT pTurtleDoc fp t) s of
+    case runState (runParserT pTurtleDoc (maybe "" toFilePath fp) t) st of
       (Left e, _)  -> Left e
       (Right x, _) -> Right x
-  where s = initialParserState { stBase = Just . IRI . T.pack $ fp }
+  where
+    st = initialParserState { stBase = IRI . T.pack . toFilePath <$> fp }
 
-parseTurtleFile :: FilePath -> IO (Either (ParseError Char T.Text) Graph)
-parseTurtleFile fp = parseTurtle fp . TL.decodeUtf8 <$> BL.readFile fp
+parseTurtleFile :: Path a File -> IO (Either (ParseError Char T.Text) Graph)
+parseTurtleFile fp = parseTurtle (Just fp) . TL.decodeUtf8 <$>
+                       BL.readFile (toFilePath fp)
 
 
 -- Functions that work on the parser state.
@@ -201,29 +212,30 @@ pObjectList = (pObject <* pWS) `sepBy` (char ',' <* pWS)
 -- | [9] verb (this parser sets stCurPredicate)
 pVerb :: TurtleParser Term
 pVerb = do
-    p <- pPredicate <|> pA <?> "verb"
+    p <- try pPredicate <|> pA <?> "verb"
     setCurPredicate (Just p)
     pure p
   where
     pA :: TurtleParser Term
-    pA = char 'a' *> pure (iterm rdfNS (IRI "type"))
+    pA = char 'a' *> pure (ITerm $ rdfNS # "type")
 
 -- | [10] subject (this parser sets stCurSubject)
 pSubject :: TurtleParser Term
 pSubject = do
-    s <- (iriToTerm <$> pIRI) <|> pBlankNode <|> pCollection
+    s <- (ITerm <$> pIRI) <|> pBlankNode <|> pCollection
     setCurSubject (Just s)
     pure s
 
 -- | [11] predicate
 pPredicate :: TurtleParser Term
-pPredicate = iriToTerm <$> pIRI
+pPredicate = ITerm <$> pIRI
 
 -- | [12] object
--- Each object N in the document produces an RDF triple: curSubject curPredicate N.
+-- Each object N in the document produces an RDF triple:
+--   curSubject curPredicate N .
 pObject :: TurtleParser Triple
 pObject = do
-    o <- (iriToTerm <$> pIRI)
+    o <- (ITerm <$> pIRI)
          <|> try pBlankNodePropertyList
          <|> pBlankNode
          <|> pCollection
@@ -278,20 +290,20 @@ pCollection = do
   where
     go :: Term -> TurtleParser Term
     go n = do
-      t <- withSubjPred (Just n) (Just rdfFirst) (pWS *> optional pObject)
+      t <- withSubjPred (Just n) (Just . ITerm $ rdfFirst) (pWS *> optional pObject)
       case t of
         Just t' -> do
           addTriple t'
           n' <- BNodeGen <$> getNextBlankNodeID
-          addTriple $ Triple n rdfRest n'
+          addTriple $ Triple n (ITerm rdfRest) n'
           go n'
         Nothing -> do
-          addTriple $ Triple n rdfRest rdfNil
+          addTriple $ Triple n (ITerm rdfRest) (ITerm rdfNil)
           pure n
 
-    rdfFirst = iterm rdfNS (IRI "first")
-    rdfRest = iterm rdfNS (IRI "rest")
-    rdfNil = iterm rdfNS (IRI "nil")
+    rdfFirst = rdfNS # "first"
+    rdfRest  = rdfNS # "rest"
+    rdfNil   = rdfNS # "nil"
 
 -- | [16] NumericLiteral
 pNumericLiteral :: TurtleParser Term
@@ -314,7 +326,7 @@ pRDFLiteral = do
 pBooleanLiteral :: TurtleParser Term
 pBooleanLiteral = do
   l <- TL.toStrict <$> (string "true" <|> string "false")
-  pure $ typedL l (xsdNS `unsafeAppendIRI` (IRI "boolean"))
+  pure $ typedL l (xsdNS # "boolean")
 
 -- | [17] String
 pString :: TurtleParser T.Text
@@ -325,20 +337,18 @@ pString = pStringLiteralLongSingleQuote
 
 -- | [135s] iri
 pIRI :: TurtleParser IRI
-pIRI = pIRIRef <|> pPrefixedName
+pIRI = try pIRIRef <|> pPrefixedName
 
 -- | [136s] PrefixedName
 pPrefixedName :: TurtleParser IRI
-pPrefixedName =
-    label "PrefixedName: PNAME_LN'" pPNameLN <|>
-    label "PrefixedName: PNAME_NS'" pPNameNS'
+pPrefixedName = try pPNameLN <|> pPNameNS'
   where
     pPNameNS' = do
       p <- pPNameNS
       iri <- lookupNamespaceIRI p
       case iri of
         Just i -> pure i
-        Nothing -> customFailure $ "namespace '" <> T.pack (show p) <> "' is not defined."
+        Nothing -> customFailure $ "Namespace '" <> T.pack (show p) <> "' is not defined."
 
 -- | [137s] BlankNode
 pBlankNode :: TurtleParser Term
@@ -348,17 +358,17 @@ pBlankNode = pBlankNodeLabel <|> pAnon
 pIRIRef :: TurtleParser IRI
 pIRIRef = do
     iri <- IRI <$> between (char '<') (char '>') iriChars
-    case isAbsoluteIRI iri of
+    case LD.isAbsoluteIRI iri of
       Just True -> pure iri
       Just False -> do
         base <- gets stBase
         case base of
           Just base' ->
-            case LD.appendIRI base' iri of
+            case iri `LD.relativeTo` base' of
               Just iri' -> pure iri'
-              Nothing -> customFailure $ "Could not resolve relative IRI '" <> unIRI iri <> "'."
-          Nothing -> customFailure $ "Relative IRI '" <> unIRI iri <> "' found, but there is no base IRI defined."
-      Nothing -> customFailure $ "Could not determine if IRI '" <> unIRI iri <> "' is absolute."
+              Nothing -> customFailure $ "Could not resolve relative IRI '" <> LD.unIRI iri <> "'."
+          Nothing -> pure iri
+      Nothing -> customFailure $ "Could not determine if IRI '" <> LD.unIRI iri <> "' is absolute."
   where
     iriChars = TL.toStrict <$> takeWhileP
       (Just "IRI char")
@@ -366,7 +376,10 @@ pIRIRef = do
 
 -- | [139s] PNAME_NS
 pPNameNS :: TurtleParser Prefix
-pPNameNS = Prefix <$> option "" pPNPrefix <* char ':'
+pPNameNS = do
+   p <- option "" pPNPrefix
+   _ <- char ':'
+   pure (Prefix p)
 
 -- | [140s] PNAME_LN
 pPNameLN :: TurtleParser IRI
@@ -374,15 +387,16 @@ pPNameLN = do
   prefix <- pPNameNS
   prefixIRI <- lookupNamespaceIRI prefix
   case prefixIRI of
-    Just i -> do
+    Just prefix' -> do
       local <- IRI <$> pPNLocal
-      case LD.appendIRI i local of
+      case local `LD.relativeTo` prefix'  of
         Just iri -> pure iri
-        Nothing -> customFailure $ "could not join IRI's: '" <> unIRI i <> "' and '" <> T.pack (show local) <> "'."
-    Nothing -> customFailure $ "namespace '" <> T.pack (show prefix) <> "' is not defined."
+        Nothing -> customFailure $ "Could not join IRI's: '" <> LD.unIRI prefix' <> "' and '" <> T.pack (show local) <> "'."
+    Nothing -> customFailure $ "Namespace '" <> T.pack (show prefix) <> "' is not defined."
 
 -- | [141s] BLANK_NODE_LABEL
 -- TODO remove partial head and last
+-- TODO if blank is of form _:genidXXX return BNodeGen with new id instead of BNode.
 pBlankNodeLabel :: TurtleParser Term
 pBlankNodeLabel = do
   _ <- string "_:"
@@ -392,8 +406,8 @@ pBlankNodeLabel = do
   if isPNCharsU hd || isDigit hd
     then if isPNChars lt
       then pure (BNode l)
-      else customFailure $ "blank node label may not end with '" <> (T.singleton lt) <> "'."
-    else customFailure $ "blank node label may not start with '" <> (T.singleton hd) <> "'."
+      else customFailure $ "Blank node label may not end with '" <> (T.singleton lt) <> "'."
+    else customFailure $ "Blank node label may not start with '" <> (T.singleton hd) <> "'."
 
 -- | [144s] LANGTAG
 -- TODO remove partial head and last
@@ -404,8 +418,8 @@ pLangTag = do
     if validFirstChar (T.head s)
       then if validLastChar (T.last s)
         then pure s
-        else customFailure "language identifier may not end with a dash."
-      else customFailure "language identifier must start with a letter."
+        else customFailure "Language identifier may not end with a dash."
+      else customFailure "Language identifier must start with a letter."
   where
     validChar c = c == '-' || isAsciiLower c || isAsciiUpper c || isDigit c
     validFirstChar c = isAsciiLower c || isAsciiUpper c
@@ -417,7 +431,7 @@ pInteger = do
   s <- option "" (T.singleton <$> (oneOf ['+', '-']))
   i <- TL.toStrict <$> takeWhile1P Nothing isDigit
   notFollowedBy (char '.')
-  pure $ typedL (s <> i) (xsdNS `unsafeAppendIRI` (IRI "integer"))
+  pure $ typedL (s <> i) (xsdNS # "integer")
 
 -- | [20] DECIMAL
 pDecimal :: TurtleParser Term
@@ -427,7 +441,7 @@ pDecimal = do
   _ <- char '.'
   d <- TL.toStrict <$> takeWhile1P Nothing isDigit
   notFollowedBy pExponent
-  pure $ typedL (s <> i <> "." <> d) (xsdNS `unsafeAppendIRI` (IRI "decimal"))
+  pure $ typedL (s <> i <> "." <> d) (xsdNS # "decimal")
 
 -- [21] DOUBLE
 pDouble :: TurtleParser Term
@@ -438,8 +452,8 @@ pDouble = do
     d <- TL.toStrict <$> takeWhileP Nothing isDigit
     e <- pExponent
     if T.null i && T.null d
-      then customFailure $ "invalid double format"
-      else pure $ typedL (s <> i <> "." <> d <> e) (xsdNS `unsafeAppendIRI` (IRI "double"))
+      then customFailure $ "Invalid double format."
+      else pure $ typedL (s <> i <> "." <> d <> e) (xsdNS # "double")
 
 -- [154s] TODO
 pExponent :: TurtleParser T.Text
@@ -552,31 +566,28 @@ isPNChars c = isPNCharsU c
     || (c >= '\x203f' && c <= '\x2040')
 
 -- [167s]
--- TODO remove partial head and last
+-- TODO remove partial last
 pPNPrefix :: TurtleParser T.Text
 pPNPrefix = do
+  x <- T.singleton <$> satisfy isPNCharsBase
   p <- TL.toStrict <$> takeWhile1P Nothing isPNChars
-  let hd = T.head p
-      lt = T.last p
-  if isPNCharsBase hd
-    then if isPNChars lt
-      then pure p
-      else customFailure $ "prefix may not end with '" <> (T.singleton lt) <> "'."
-    else customFailure $ "prefix may not start with '" <> (T.singleton hd) <> "'."
+  let lt = T.last p
+  if isPNChars lt
+    then pure (x <> p)
+    else customFailure $ "Prefix may not end with '" <> (T.singleton lt) <> "'."
 
 -- [168s] PN_LOCAL
--- TODO remove partial head and last
+-- TODO remove partial last
 pPNLocal :: TurtleParser T.Text
 pPNLocal = do
-  p <- mconcat <$> many (
+  x <- T.singleton <$> satisfy (\c ->
+      isPNCharsU c || c == ':' || isDigit c || c == '%' || c == '\\')
+  p <- TL.toStrict . mconcat <$> many (
       takeWhile1P Nothing (\c -> isPNChars c || c == '.' || c == ':') <|> pPLX)
-  let hd = TL.head p
-      lt = TL.last p
-  if isPNCharsU hd || hd == ':' || isDigit hd || hd == '%' || hd == '\\'
-    then if isPNChars lt || lt == ':' || hd == '%' || hd == '\\'
-      then pure (TL.toStrict p)
-      else customFailure $ "PN_LOCAL may not end with '" <> (T.singleton lt) <> "'."
-    else customFailure $ "PN_LOCAL may not start with '" <> (T.singleton hd) <> "'."
+  let lt = T.last p
+  if isPNChars lt || lt == ':' || lt == '%' || lt == '\\'
+    then pure (x <> p)
+    else customFailure $ "PN_LOCAL may not end with '" <> (T.singleton lt) <> "'."
 
 -- | [169s] PLX (Note: this should not be decoded by the parser!)
 pPLX :: TurtleParser TL.Text

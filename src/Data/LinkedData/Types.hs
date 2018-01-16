@@ -1,8 +1,10 @@
 -- | RDF types
--- 
+--
 -- See:
 -- - https://www.w3.org/TR/rdf11-concepts/
 --
+-- TODO:
+-- - remove Var data constructor from Term
 
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE OverloadedStrings #-}
@@ -59,7 +61,7 @@ triple s p o =
 
 
 -- | RDF Term
-data Term = ITerm T.Text  -- ^ IRI term
+data Term = ITerm IRI     -- ^ IRI term
           | LTerm LValue  -- ^ Literal term
           | BNode T.Text  -- ^ Blank node with label
           | BNodeGen Int  -- ^ Generated blank node with number
@@ -69,11 +71,14 @@ data Term = ITerm T.Text  -- ^ IRI term
 instance Binary Term
 
 instance Show Term where
-  show (ITerm i)    = "<" <> (T.unpack i) <> ">"
-  show (LTerm v)    = show v
-  show (BNode s)    = "_:" <> (T.unpack s)
-  show (BNodeGen i) = "_:a" <> show i
-  show (Var s)      = "?" <> (T.unpack s)
+  show (ITerm (IRI i)) = "<" <> (T.unpack i) <> ">"
+  show (LTerm v)       = show v
+  show (BNode s)       = "_:" <> (T.unpack s)
+  show (BNodeGen i)    = "_:a" <> show i
+  show (Var s)         = "?" <> (T.unpack s)
+
+iterm :: T.Text -> Term
+iterm i = ITerm (IRI i)
 
 
 -- | Literal value
@@ -112,7 +117,7 @@ instance Binary IRI
 
 
 -- | Commonly used namespaces
-owlNS, rdfNS, rdfsNS, rdfaNS, xhvNS, xmlNS, xsdNS :: IRI
+owlNS, rdfNS, rdfsNS, rdfaNS, xhvNS, xmlNS, xsdNS, foafNS :: IRI
 owlNS  = IRI "http://www.w3.org/2002/07/owl#"
 rdfNS  = IRI "http://www.w3.org/1999/02/22-rdf-syntax-ns#"
 rdfsNS = IRI "http://www.w3.org/2000/01/rdf-schema#"
@@ -120,3 +125,4 @@ rdfaNS = IRI "http://www.w3.org/ns/rdfa#"
 xhvNS  = IRI "http://www.w3.org/1999/xhtml/vocab#"
 xmlNS  = IRI "http://www.w3.org/XML/1998/namespace"
 xsdNS  = IRI "http://www.w3.org/2001/XMLSchema#"
+foafNS = IRI "http://xmlns.com/foaf/0.1/"

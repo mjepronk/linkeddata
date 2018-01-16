@@ -6,7 +6,10 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 
-module Data.LinkedData.Serialisation.NTriplesParser where
+module Data.LinkedData.Serialisation.NTriplesParser
+  ( parseNTriples
+  , parseNTriplesFile )
+where
 
 import           Data.Char (digitToInt, chr, isDigit, isAsciiLower, isAsciiUpper)
 import           Data.Foldable (find)
@@ -22,18 +25,23 @@ import qualified Data.Text.Lazy.Encoding as TL
 import           Text.Megaparsec ((<?>), ParsecT, ParseError(..), parse,
                      try, customFailure, takeWhileP, takeWhile1P, eof)
 import           Text.Megaparsec.Char (char, hexDigitChar, oneOf, string)
-import           Data.LinkedData.Types 
+import           Data.LinkedData.Types
 import qualified Data.LinkedData.Types as LD
+import           Path (Path, File, toFilePath)
 
 
 type NTriplesParser = ParsecT T.Text TL.Text Identity
 
 
-parseNTriples :: FilePath -> TL.Text -> Either (ParseError Char T.Text) Graph
-parseNTriples = parse pNTriplesDoc
+parseNTriples :: Maybe (Path a File)
+              -> TL.Text
+              -> Either (ParseError Char T.Text) Graph
+parseNTriples p = parse pNTriplesDoc (maybe "" toFilePath p)
 
-parseNTriplesFile :: FilePath -> IO (Either (ParseError Char T.Text) Graph)
-parseNTriplesFile fp = parseNTriples fp . TL.decodeUtf8 <$> BL.readFile fp
+parseNTriplesFile :: Path a File
+                  -> IO (Either (ParseError Char T.Text) Graph)
+parseNTriplesFile fp = parseNTriples (Just fp) . TL.decodeUtf8 <$>
+                         BL.readFile (toFilePath fp)
 
 
 -- [1] ntriplesDoc
@@ -76,7 +84,7 @@ pLiteral = do
     Nothing -> do
       t <- optional (string "^^" *> pIRIRef)
       case t of
-        Just (ITerm t') -> pure (typedL s (IRI t'))
+        Just (ITerm t') -> pure (typedL s t')
         _               -> pure (plainL s)
 
 -- [144s] LANG_TAG
@@ -110,7 +118,7 @@ pComment = void $ char '#' *> takeWhileP (Just "comment") (`notElem` ['\r', '\n'
 
 -- [8] IRIREF
 pIRIRef :: NTriplesParser Term
-pIRIRef = ITerm <$> between (char '<') (char '>') iriChars
+pIRIRef = ITerm . IRI <$> between (char '<') (char '>') iriChars
     -- TODO: T.concat <$> many (iriChars <|> pUChar)
   where
     iriChars = TL.toStrict <$> takeWhileP

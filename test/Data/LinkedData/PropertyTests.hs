@@ -2,11 +2,9 @@
 
 module Data.LinkedData.PropertyTests where
 
-import           Data.Maybe (catMaybes)
 import           Data.Monoid ((<>))
 import           Data.LinkedData.Types
-import qualified Data.LinkedData.Types as LD
-import qualified Data.LinkedData.IRI as LD
+import qualified Data.LinkedData as LD
 import           Data.Text (Text)
 import qualified Data.Text as T
 import qualified Text.URI as URI
@@ -28,8 +26,7 @@ instance Arbitrary LValue where
 instance Arbitrary Graph where
     arbitrary = do
         ts <- arbitraryTriples
-        base <- arbitrary 
-        pure (LD.emptyGraph { triples = ts, base = base })
+        pure (LD.emptyGraph { triples = ts })
 
 instance Arbitrary IRI where
     arbitrary = IRI . URI.render <$> arbitrary
@@ -46,7 +43,7 @@ arbitraryPredicate = iterms
 arbitraryObject = oneof [iterms, bnodes, lterms]
 
 iterms :: Gen Term
-iterms = ITerm . URI.render <$> arbitrary
+iterms = ITerm . IRI . URI.render <$> arbitrary
 
 lterms :: Gen Term
 lterms = oneof $ pure . LTerm <$> literals
@@ -55,7 +52,7 @@ bnodes :: Gen Term
 bnodes = oneof $ pure <$> bnodes' <> bnodegens
 
 bnodes' :: [Term]
-bnodes' = BNode <$> (\i -> T.pack "_genid" `T.append` T.pack (show i)) <$> [1..5]
+bnodes' = BNode . (\i -> T.pack "arb" `T.append` T.pack (show i)) <$> ([1..5] :: [Int])
 
 bnodegens :: [Term]
 bnodegens = BNodeGen <$> [1..5]
@@ -79,4 +76,4 @@ languages :: [Text]
 languages = ["fr", "en", "nl-nl"]
 
 datatypes :: [IRI]
-datatypes = LD.unsafeAppendIRI xsdNS . IRI <$> ["string", "int", "token"]
+datatypes = LD.unsafeRelativeTo xsdNS . IRI <$> ["string", "int", "token"]

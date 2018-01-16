@@ -6,12 +6,26 @@
 --   Florence, Italy, May 18–22, 2015
 --   http://aidanhogan.com/docs/skolems_blank_nodes_www.pdf
 --
+-- TODO:
+-- - implement the complete algorithm from the paper (handle automorphism)
+-- - create a bijection, which would serve as the basis for a diff tool
+-- - use Int64 as hash ? use Digest from cryptonite as hash ?
+--   (which is possible to convert to a bytearray that supports for example xor...)
+-- - use XOR instead of (+) ?
+
 
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
-module Data.LinkedData.Graphs where
+module Data.LinkedData.Graphs
+  ( isIsomorphic
+  , isIsomorphicWithDiff
+  , canonicaliseBlankNodes
+  , skolemiseGraphCanonical
+  )
+where
 
+import           Data.List ((\\))
 import           Data.Monoid ((<>))
 import           Data.Maybe (fromJust)
 import           Data.Foldable (foldl')
@@ -21,7 +35,7 @@ import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text as T
 import qualified Data.Map.Strict as M
-import           Data.LinkedData.Types (Graph(..), Triple(..), Triples, Term(..))
+import           Data.LinkedData.Types (Graph(..), Triple(..), Triples, Term(..), IRI(..))
 import           Data.LinkedData.Utils (isBlankNode)
 
 
@@ -38,7 +52,7 @@ data HashF = HashF {
 
     -- | Hash a char.
   , hashChar :: Char -> Int
-  
+
     -- | Hash a list of binary encodable data, with a normal hash function.
   , hashCombineOrdered :: Int -> Int -> Int
 
@@ -75,9 +89,25 @@ naiveHashF = HashF {
 isIsomorphic :: Graph -> Graph -> Bool
 isIsomorphic a b = (hashGraph defaultHashF a) == (hashGraph defaultHashF b)
 
+
+-- | Test if two graphs are isomorphic, but if this is not the case returns the
+-- triples that are in graph 'a' but not in 'b', and vice versa.
+--
+-- TODO: reconvert to original BNode's in diffA and diffB
+isIsomorphicWithDiff :: Graph -> Graph -> Either (Triples, Triples) ()
+isIsomorphicWithDiff a b =
+   let a' = canonicaliseBlankNodes defaultHashF a
+       b' = canonicaliseBlankNodes defaultHashF b
+       diffA = triples a' \\ triples b'
+       diffB = triples b' \\ triples a'
+   in  if null diffA && null diffB
+         then pure ()
+         else Left (diffA, diffB)
+
+
 -- | Skolemise a RDF graph by assigning a unique UUID to every blank node.
-skolemiseGraphUUID :: Graph -> Graph
-skolemiseGraphUUID = undefined
+-- skolemiseGraphUUID :: Graph -> Graph
+-- skolemiseGraphUUID = undefined
 
 -- | Skolemise a RDF graph so that the output graph is equal to another
 -- skolemised graph if and only if the input graphs are isomorphic.
@@ -88,13 +118,13 @@ skolemiseGraphCanonical hf urlprefix (g@Graph { triples }) = g{ triples=skolTrip
     ghash = hashGraphWithClr hf clr g
     skolTriple (Triple s p o) = Triple (skolTerm s) p (skolTerm o)
     skolTerm t
-        | isBlankNode t = ITerm (urlprefix <> "/.well-known/genid/canonical/" <> (T.pack . show $ h))
-        | otherwise = t
+        | isBlankNode t = ITerm . IRI $ urlprefix <> "/.well-known/genid/canonical/" <> (T.pack . show $ h)
+        | otherwise     = t
         where h = (hashCombineOrdered hf) (fromJust (M.lookup t clr)) ghash
 
 -- | Convert skolemised IRI's to blank nodes.
-deskolemiseGraph :: Graph -> Graph
-deskolemiseGraph _ = undefined
+-- deskolemiseGraph :: Graph -> Graph
+-- deskolemiseGraph _ = undefined
 
 
 -- TODO
@@ -104,12 +134,13 @@ deskolemiseGraph _ = undefined
 -- | Hash a graph.
 hashGraph :: HashF -> Graph -> Int
 hashGraph hf g = hashGraphWithClr hf clr g
-  where 
+  where
     clr = colour hf True g
 
 -- | Internal, hash a graph with a precomputed colour map.
 hashGraphWithClr :: HashF -> ColourMap -> Graph -> Int
-hashGraphWithClr hf clr Graph { triples } = foldl' (hashCombineUnordered hf) (hashNull hf) (hashTriple <$> triples)
+hashGraphWithClr hf clr Graph { triples } =
+    foldl' (hashCombineUnordered hf) (hashNull hf) (hashTriple <$> triples)
   where
     ho = hashCombineOrdered hf
     hashTriple (Triple s p o) = ho (ho (getColour s) (getColour p)) (getColour o)
