@@ -1,4 +1,4 @@
-module Data.LinkedData.Query
+module LinkedData.Query
   ( query
   , select
   )
@@ -7,8 +7,8 @@ where
 import           Data.Foldable (foldl')
 import           Data.Maybe (catMaybes, fromMaybe, mapMaybe)
 import qualified Data.Map.Strict as M
-import           Data.LinkedData.Types
-import           Data.LinkedData.Utils (subjectOf, predicateOf, objectOf, isQueryVar)
+import           LinkedData.Types
+import           LinkedData.Utils (subjectOf, predicateOf, objectOf, isQueryVar)
 
 -- | Simple query
 query :: Graph -> Term -> Term -> Term -> Triples

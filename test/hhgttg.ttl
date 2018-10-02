@@ -3,15 +3,18 @@
 @prefix foaf: <http://xmlns.com/foaf/0.1/> .
 
 <Arthur+Dent> a foaf:Person ;
-    foaf:knows <Ford+Prefect>, <Tricia+McMillan> ;
-    foaf:gender "male" ;
+    foaf:name "Arthur Dent" ;
     foaf:familyName "Dent" ;
     foaf:givenName "Arthur" ;
-    foaf:name "Arthur Dent" .
+    foaf:gender "male" ;
+    foaf:knows <Ford+Prefect>, <Tricia+McMillan> .
 
 <Ford+Prefect> a foaf:Person ;
     foaf:name "Ford Prefect" .
 
 <Tricia+McMillan> a foaf:Person ;
     foaf:name "Tricia McMillan" ;
-    foaf:nick "Trillian" .
+    foaf:familyName "McMillan" ;
+    foaf:givenName "Tricia" ;
+    foaf:nick "Trillian" ;
+    foaf:gender "female" .

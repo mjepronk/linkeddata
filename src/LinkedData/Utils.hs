@@ -1,6 +1,14 @@
-module Data.LinkedData.Utils where
+module LinkedData.Utils
+  ( isBlankNode
+  , isQueryVar
+  , subjectOf
+  , predicateOf
+  , objectOf
+  )
 
-import Data.LinkedData.Types (Triple(..), Term(..))
+where
+
+import LinkedData.Types (Triple(..), Term(..))
 
 
 -- | Is term a blank node?
