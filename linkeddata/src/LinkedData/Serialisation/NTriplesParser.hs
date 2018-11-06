@@ -32,7 +32,8 @@ import           LinkedData.Types
 import           LinkedData.IRI (mkAbsIRI)
 import           LinkedData.Serialisation.Common (pStringLiteralQuote,
                      pUChar, pLangTag, pBlankNodeLabel)
-import           LinkedData.Serialisation.Streaming (parsed, decodeByteString, decodeUtf8Pure, handleDecodeError, handleParserError)
+import           LinkedData.Serialisation.Streaming (parsed, decodeByteString,
+                     decodeUtf8Pure, handleDecodeError, handleParserError)
 
 
 -- | Consume strict 'T.Text' values in N-Triples format and yield parsed
@@ -79,9 +80,7 @@ pTriple = do
   p <- pPredicate <* pWS
   o <- pObject    <* pWS
   _ <- char '.'   <* pWS
-  case triple s p o of
-    Right t -> pure t
-    Left  e -> fail ((show (s, p, o)) <> ": " <> T.unpack e)
+  pure (Triple s p o)
 
 -- | [3] subject
 pSubject :: Parser Term

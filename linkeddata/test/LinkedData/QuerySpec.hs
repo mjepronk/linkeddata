@@ -3,9 +3,9 @@
 module LinkedData.QuerySpec where
 
 import           Data.Monoid ((<>))
-import           LinkedData.Types
-import           LinkedData (IRI, Abs, (.:.))
-import qualified LinkedData as LD
+import           LinkedData (Graph, Triple(..), TriplePattern(..), Term(..),
+                     Var(..), IRI, Abs, (.:.), plainL, foafNS, rdfNS, rdfType,
+                     query, select)
 import           LinkedData.Serialisation (parseTurtleFile, toGraphWithMeta, runResourceT)
 import           LinkedData.QQ (absiri, reliri)
 import           System.Directory (getCurrentDirectory)
@@ -22,14 +22,14 @@ spec = do
       -- h2g2:Arthur+Dent
       let arthur = ITerm $ h2g2NS .:. [reliri|Arthur+Dent|]
           name   = ITerm $ foafNS .:. [reliri|name|]
-          result = LD.query g arthur name (Var "name")
+          result = query g (TriplePattern (Right arthur) (Right name) (Left (Var "name")))
       result `shouldBe` [Triple arthur name (plainL "Arthur Dent")]
     it "queries multiple triples from a sample graph" $ do
       g <- parseH2G2File
       -- Query all the people in the graph
       let person = ITerm $ foafNS .:. [reliri|Person|]
-          a      = ITerm $ rdfNS .:. [reliri|type|]
-          result = LD.query g (Var "person") a person
+          a      = ITerm $ rdfType
+          result = query g (TriplePattern (Left (Var "person")) (Right a) (Right person))
       result `shouldBe` [
           Triple (ITerm $ h2g2NS .:. [reliri|Arthur+Dent|])     a person
         , Triple (ITerm $ h2g2NS .:. [reliri|Ford+Prefect|])    a person
@@ -43,12 +43,12 @@ spec = do
           who     = Var "who"
           name    = Var "name"
           clauses = [
-              Triple arthur (ITerm $ rdfNS .:. [reliri|type|]) (ITerm $ foafNS .:. [reliri|Person|])
-            , Triple arthur (ITerm $ foafNS .:. [reliri|name|]) (plainL "Arthur Dent")
-            , Triple arthur (ITerm $ foafNS .:. [reliri|knows|]) who
-            , Triple who (ITerm $ foafNS .:. [reliri|name|]) name
+              TriplePattern (Left arthur) (Right . ITerm $ rdfNS .:. [reliri|type|]) (Right . ITerm $ foafNS .:. [reliri|Person|])
+            , TriplePattern (Left arthur) (Right . ITerm $ foafNS .:. [reliri|name|]) (Right (plainL "Arthur Dent"))
+            , TriplePattern (Left arthur) (Right . ITerm $ foafNS .:. [reliri|knows|]) (Left who)
+            , TriplePattern (Left who) (Right . ITerm $ foafNS .:. [reliri|name|]) (Left name)
             ]
-          result  = LD.select g [name] clauses
+          result  = select g [name] clauses
       result `shouldBe` [[plainL "Ford Prefect"], [plainL "Tricia McMillan"]]
 
 

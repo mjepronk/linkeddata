@@ -6,7 +6,6 @@
 
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns    #-}
-{-# LANGUAGE QuasiQuotes       #-}
 
 module LinkedData.Serialisation.TurtleParser
   ( parseTurtle
@@ -42,8 +41,10 @@ import           LinkedData.IRI (IRI, Abs, Prefix(..), mkAbsIRI, mkRelIRI,
 import           LinkedData.Serialisation.Common (pStringLiteralQuote,
                      pUChar, pEChar, pLangTag, pBlankNodeLabel, isPNCharsBase,
                      isPNCharsU, isPNChars)
-import           LinkedData.Serialisation.Streaming (parsedWith, decodeByteString, decodeUtf8Pure, handleDecodeError)
-import           LinkedData.QQ (reliri)
+import           LinkedData.Serialisation.Streaming (parsedWith,
+                     decodeByteString, decodeUtf8Pure, handleDecodeError)
+import           LinkedData.Namespaces (rdfType, rdfFirst, rdfRest, rdfNil,
+                     xsdBoolean, xsdInteger, xsdDecimal, xsdDouble)
 
 
 type TurtleParser = StateT ParserState Parser
@@ -55,24 +56,24 @@ type TurtleParser = StateT ParserState Parser
 -- - https://www.w3.org/TR/turtle/#sec-grammar-grammar#h3_sec-parsing-state
 
 data ParserState = ParserState
-       { stBase         :: Maybe (IRI Abs)
-       , stNamespaces   :: Namespaces
-       , stBlankNodeID  :: Int
-       , stCurSubject   :: Maybe Term
-       , stCurPredicate :: Maybe Term
-       , stTriples      :: Triples
-       }
+    { stBase         :: Maybe (IRI Abs)
+    , stNamespaces   :: Namespaces
+    , stBlankNodeID  :: Int
+    , stCurSubject   :: Maybe Term
+    , stCurPredicate :: Maybe Term
+    , stTriples      :: Triples
+    }
   deriving Show
 
 initialParserState :: ParserState
 initialParserState = ParserState
-  { stBase         = Nothing
-  , stNamespaces   = M.empty
-  , stBlankNodeID  = 0
-  , stCurSubject   = Nothing
-  , stCurPredicate = Nothing
-  , stTriples      = []
-  }
+    { stBase         = Nothing
+    , stNamespaces   = M.empty
+    , stBlankNodeID  = 0
+    , stCurSubject   = Nothing
+    , stCurPredicate = Nothing
+    , stTriples      = []
+    }
 
 
 -- | Consume strict 'T.Text' values in Turtle format and yield parsed triples.
@@ -127,12 +128,12 @@ addNamespace p i =
   modify' (\st@ParserState { stNamespaces } -> st {
     stNamespaces=M.insert p i stNamespaces })
 
-lookupNamespaceIRI :: Prefix -> TurtleParser (Maybe (IRI Abs))
-lookupNamespaceIRI p =
+lookupNamespace :: Prefix -> TurtleParser (Maybe (IRI Abs))
+lookupNamespace p =
   gets (\ParserState { stNamespaces } -> M.lookup p stNamespaces)
 
-setBaseIRI :: IRI Abs -> TurtleParser ()
-setBaseIRI iri = modify' (\st -> st { stBase=Just iri })
+setBase :: IRI Abs -> TurtleParser ()
+setBase iri = modify' (\st -> st { stBase=Just iri })
 
 getCurSubject :: TurtleParser Term
 getCurSubject = do
@@ -156,12 +157,6 @@ setCurPredicate :: Maybe Term -> TurtleParser ()
 setCurPredicate p =
   modify' (\st -> st { stCurPredicate=p })
 
-getNextBlankNodeID :: TurtleParser Int
-getNextBlankNodeID = do
-  i <- gets (\ParserState { stBlankNodeID } -> stBlankNodeID + 1)
-  modify' (\st -> st{ stBlankNodeID=i })
-  pure i
-
 withSubjPred :: Maybe Term -> Maybe Term -> TurtleParser a -> TurtleParser a
 withSubjPred s p parser = do
     (s', p') <- gets(\ParserState { stCurSubject, stCurPredicate } -> (stCurSubject, stCurPredicate))
@@ -169,6 +164,12 @@ withSubjPred s p parser = do
     r <- parser
     modify' (\st -> st { stCurSubject=s', stCurPredicate=p' })
     pure r
+
+getNextBlankNodeID :: TurtleParser Int
+getNextBlankNodeID = do
+  i <- gets (\ParserState { stBlankNodeID } -> stBlankNodeID + 1)
+  modify' (\st -> st{ stBlankNodeID=i })
+  pure i
 
 getTriples :: TurtleParser Triples
 getTriples = do
@@ -210,13 +211,13 @@ pPrefixID = do
 pBase :: TurtleParser ()
 pBase = do
   iri <- lift (string "@base" *> pWS1) *> pIRIRef  <* lift (pWS <* char '.')
-  setBaseIRI iri
+  setBase iri
 
 -- | [5s] sparqlBase
 pSparqlBase :: TurtleParser ()
 pSparqlBase = do
   iri <- lift (asciiCI "BASE" *> pWS1) *> pIRIRef <* lift pWS1
-  setBaseIRI iri
+  setBase iri
 
 -- | [6s] sparqlPrefix
 pSparqlPrefix :: TurtleParser ()
@@ -257,7 +258,7 @@ pVerb = do
     pure p
   where
     pA :: TurtleParser Term
-    pA = lift (char 'a') *> pure (ITerm $ rdfNS .:. [reliri|type|])
+    pA = lift (char 'a') *> pure (ITerm rdfType)
 
 -- | [10] subject (this parser sets stCurSubject)
 pSubject :: TurtleParser Term
@@ -282,9 +283,7 @@ pObject = do
          <|> pBlankNode
          <|> pCollection
          <|> pLiteral
-    case triple s p o of
-      Right t -> pure t
-      Left e -> fail $ show (s, p, o) <> ": " <> T.unpack e
+    pure (Triple s p o)
 
 -- | [13] literal
 pLiteral :: TurtleParser Term
@@ -349,10 +348,6 @@ pCollection = do
         Nothing ->
           addTriple $ Triple prevNode (ITerm rdfRest) (ITerm rdfNil)
 
-    rdfFirst = rdfNS .:. [reliri|first|]
-    rdfRest  = rdfNS .:. [reliri|rest|]
-    rdfNil   = rdfNS .:. [reliri|nil|]
-
 -- | [16] NumericLiteral
 pNumericLiteral :: TurtleParser Term
 pNumericLiteral = lift pInteger <|> lift  pDecimal <|> lift pDouble
@@ -374,7 +369,7 @@ pRDFLiteral = do
 pBooleanLiteral :: TurtleParser Term
 pBooleanLiteral = do
   l <- lift (string "true" <|> string "false")
-  pure $ typedL l (xsdNS .:. [reliri|boolean|])
+  pure $ typedL l (xsdBoolean)
 
 -- | [17] String
 pString :: TurtleParser T.Text
@@ -393,7 +388,7 @@ pPrefixedName = pPNameLN <|> pPNameNS'
   where
     pPNameNS' = do
       p <- lift pPNameNS
-      iri <- lookupNamespaceIRI p
+      iri <- lookupNamespace p
       case iri of
         Just i -> pure i
         Nothing -> fail $ "Namespace '" <> show p <> "' is not defined."
@@ -426,7 +421,7 @@ pPNameLN :: TurtleParser (IRI Abs)
 pPNameLN = do
     prefix <- lift pPNameNS
     local <- lift pPNLocal
-    iri <- lookupNamespaceIRI prefix
+    iri <- lookupNamespace prefix
     case iri of
       Nothing -> fail $ "Namespace '" <> show prefix <> "' is not defined."
       Just iri' ->
@@ -453,14 +448,14 @@ pInteger = do
     s <- pSign
     x <- pDigits1
     notFollowedBy (pDot <|> pExponent)
-    pure $ typedL (s <> x) (xsdNS .:. [reliri|integer|])
+    pure $ typedL (s <> x) xsdInteger
 
 -- | [20] DECIMAL
 pDecimal :: Parser Term
 pDecimal = do
     x <- mconcat <$> sequence [pSign, pDigits, pDot, pDigits1]
     notFollowedBy pExponent
-    pure $ typedL x (xsdNS .:. [reliri|decimal|])
+    pure $ typedL x xsdDecimal
 
 -- | [21] DOUBLE
 pDouble :: Parser Term
@@ -469,7 +464,7 @@ pDouble = do
     x <- try (mconcat <$> sequence [pDigits1, pDot, pDigits, pExponent])
          <|> try (mconcat <$> sequence [pDot, pDigits1, pExponent])
          <|> mconcat <$> sequence [pDigits1, pExponent]
-    pure $ typedL (s <> x) (xsdNS .:. [reliri|double|])
+    pure $ typedL (s <> x) xsdDouble
 
 -- | [154s] EXPONENT
 pExponent :: Parser T.Text

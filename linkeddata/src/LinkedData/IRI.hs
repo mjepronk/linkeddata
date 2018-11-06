@@ -46,11 +46,11 @@ where
 import           Prelude hiding (takeWhile)
 
 import           Data.Attoparsec.Text (Parser, parseOnly, char, endOfInput,
-                    string, option, takeWhile, takeWhile1)
+                     string, option, takeWhile, takeWhile1)
 import           Data.Binary (Binary)
 import           Data.Char (isDigit, isAsciiUpper, isAsciiLower)
 import           Data.Data (Data)
-import           Data.Either.Combinators (rightToMaybe)
+import           Data.Hashable (Hashable(..))
 import           Data.List (intersperse, stripPrefix, dropWhileEnd)
 import qualified Data.Map as M
 import           Data.Maybe (isJust, catMaybes)
@@ -80,6 +80,10 @@ instance Show (IRI t) where
   show (IRI i) = "<" <> T.unpack i <> ">"
 
 instance Binary (IRI Abs)
+instance Binary (IRI Rel)
+
+instance Hashable (IRI Abs)
+instance Hashable (IRI Rel)
 
 instance Arbitrary (IRI Rel) where
   arbitrary = renderIRI <$> arbitrary
@@ -234,7 +238,7 @@ instance Arbitrary AbsIRIParts where
 -- - https://tools.ietf.org/html/rfc3987#section-2.2
 --
 parseIRI :: T.Text -> Maybe IRIParts
-parseIRI iri = rightToMaybe (parseOnly (parseIRI' <* endOfInput) iri)
+parseIRI iri = either (const Nothing) Just (parseOnly (parseIRI' <* endOfInput) iri)
 
 parseIRI' :: Parser IRIParts
 parseIRI' = IRIParts <$> parseScheme

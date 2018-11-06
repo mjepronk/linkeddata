@@ -7,8 +7,7 @@ runResourceT $ S.print $ (parsed parser (decodeByteString decodeUtf8Pure (Q.read
 -}
 
 module LinkedData.Serialisation.Streaming
-  (
-    toGraph
+  ( toGraph
   , toGraphWithMeta
   , fromGraph
 

@@ -1,21 +1,41 @@
 # Linked Data for Haskell
 
+## Examples
+
+### Query a graph
 
 ```haskell
-import Data.LinkedData.Serialisation
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE QuasiQuotes       #-}
 
-runResourceT $ serialiseNTriplesFile "rma-edm-collection.nt" (parseTurtleFile "/home/mp/Downloads/201604-rma-edm-collection.ttl")
+import LinkedData
+import LinkedData.QQ
+import LinkedData.Serialisation
 
-runResourceT $ serialiseTurtleFile "rma-edm-collection.ttl" emptyGraphMeta (parseNTriplesFile "rma-edm-collection.nt")
+-- | Who does Arthur Dent know?
+main = do
+    let arthur  = Var "arthur"
+        who     = Var "who"
+        name    = Var "name"
+        clauses = [
+            TriplePattern (Left arthur) (Right . ITerm $ rdfNS .:. [reliri|type|]) (Right . ITerm $ foafNS .:. [reliri|Person|])
+          , TriplePattern (Left arthur) (Right . ITerm $ foafNS .:. [reliri|name|]) (Right (plainL "Arthur Dent"))
+          , TriplePattern (Left arthur) (Right . ITerm $ foafNS .:. [reliri|knows|]) (Left who)
+          , TriplePattern (Left who) (Right . ITerm $ foafNS .:. [reliri|name|]) (Left name)
+          ]
+    g <- runResourceT $ toGraphWithMeta (parseTurtleFile Nothing ("test/hhgttg.ttl"))
+    case g of
+      Right g' -> print $ select g' [name] clauses
+      Left err -> print err
 ```
 
----
+### Converting between RDF serialisation formats
 
-Do not use this library, this code is experimental!!! At this time we are
-avoiding success at all costs :-)
+Right now we support (de-)serialisation of the N-Triples and Turtle formats.
 
-You probably want to use:
-- rdf4h - https://github.com/robstewart57/rdf4h
-- hsparql - https://github.com/robstewart57/hsparql
+```haskell
+import LinkedData.Serialisation
 
----
+main =
+    runResourceT $ serialiseNTriplesFile "hhgttg.nt" (parseTurtleFile Nothing "test/hhgttg.ttl")
+```

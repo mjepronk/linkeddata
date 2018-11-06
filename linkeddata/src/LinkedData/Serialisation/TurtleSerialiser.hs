@@ -12,7 +12,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns    #-}
 {-# LANGUAGE RankNTypes        #-}
-{-# LANGUAGE QuasiQuotes       #-}
 
 module LinkedData.Serialisation.TurtleSerialiser
   ( serialiseTurtle
@@ -36,9 +35,9 @@ import           Streaming (Stream, Of)
 import qualified Streaming.Prelude as S
 
 import           LinkedData.Types
-import           LinkedData.IRI (IRI, Abs, Prefix(..), (.:.), relativeFrom, unIRI, findPrefix)
+import           LinkedData.IRI (IRI, Abs, Prefix(..), relativeFrom, unIRI, findPrefix)
+import           LinkedData.Namespaces (rdfType)
 import           LinkedData.Serialisation.Streaming (encodeByteString, encodeUtf8)
-import           LinkedData.QQ (reliri)
 
 
 type TurtleSerialiser = Reader GraphMeta
@@ -112,12 +111,11 @@ renderTerm (BNode s)    = pure $ if "genid" `T.isPrefixOf` s
                             then "_:x" <> B.fromText s
                             else "_:" <> B.fromText s
 renderTerm (BNodeGen i) = pure $ "_:genid" <> B.decimal i
-renderTerm (Var _)      = pure "" -- TODO: fail "Can't serialize query variables!"
 
 renderPredicate :: Term -> TurtleSerialiser B.Builder
 renderPredicate (ITerm iri)
-  | iri == rdfNS .:. [reliri|type|] = pure "a"
-  | otherwise = renderIRI' iri
+  | iri == rdfType = pure "a"
+  | otherwise      = renderIRI' iri
 renderPredicate t = renderTerm t
 
 renderIRI' :: IRI Abs -> TurtleSerialiser B.Builder

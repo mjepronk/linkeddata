@@ -1,26 +1,30 @@
 module LinkedData.Utils
-  ( isBlankNode
-  , isQueryVar
+  ( isIRI
+  , isBlank
+  , isLiteral
   , subjectOf
   , predicateOf
   , objectOf
   )
-
 where
 
 import LinkedData.Types (Triple(..), Term(..))
 
+-- | Is the term an IRI?
+isIRI :: Term -> Bool
+isIRI (ITerm _) = True
+isIRI _         = False
 
--- | Is term a blank node?
-isBlankNode :: Term -> Bool
-isBlankNode (BNode _) = True
-isBlankNode (BNodeGen _) = True
-isBlankNode _ = False
+-- | Is the term a blank node?
+isBlank :: Term -> Bool
+isBlank (BNode _)    = True
+isBlank (BNodeGen _) = True
+isBlank _            = False
 
--- | Is term a query variable?
-isQueryVar :: Term -> Bool
-isQueryVar (Var _) = True
-isQueryVar _       = False
+-- | Is the term a literal?
+isLiteral :: Term -> Bool
+isLiteral (LTerm _) = True
+isLiteral _         = False
 
 -- | Get subject of triple.
 subjectOf :: Triple -> Term

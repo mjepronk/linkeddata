@@ -19,7 +19,7 @@ import           Data.Char (chr, digitToInt, isAsciiLower, isAsciiUpper, isDigit
 import           Data.Foldable (find, foldl')
 import qualified Data.Text as T
 import           Data.Attoparsec.Combinator (lookAhead, count)
-import           Data.Attoparsec.Text (Parser, takeWhile1, try, char, string, satisfy)
+import           Data.Attoparsec.Text (Parser, takeWhile1, char, string, satisfy)
 
 import           LinkedData.Types
 
@@ -28,13 +28,13 @@ import           LinkedData.Types
 -- | Turtle: [22] STRING_LITERAL_QUOTE
 pStringLiteralQuote :: Parser T.Text
 pStringLiteralQuote = (char '"') *> p <* (char '"')
-  where p = mconcat <$> many (takeWhile1 (`notElem` ['"', '\\', '\n', '\r']) <|> try pEChar <|> pUChar)
+  where p = mconcat <$> many (takeWhile1 (`notElem` ['"', '\\', '\n', '\r']) <|> pEChar <|> pUChar)
 
 -- | NTriples: [10] UCHAR
 -- Turtle: [26] UCHAR
 pUChar :: Parser T.Text
 pUChar = do
-    uchar <- try uchar16 <|> uchar32
+    uchar <- uchar16 <|> uchar32
     pure $ T.singleton (chr (hexToInt uchar))
   where
     uchar16 :: Parser String

@@ -1,4 +1,5 @@
--- | QuasiQuoters for using hardcoded IRI's in your code.
+-- | QuasiQuoters for using hardcoded IRI's (for namespaces, datatypes, etc.) in
+-- your code.
 --
 
 {-# LANGUAGE TemplateHaskell #-}

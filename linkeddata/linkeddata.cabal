@@ -1,5 +1,5 @@
 name:           linkeddata
-version:        0.0.1.0
+version:        0.1.0.0
 synopsis:       Linked Data for Haskell
 description:    Please see the README on Github at <https://github.com/mjepronk/linkeddata#readme>
 homepage:       https://github.com/mjepronk/linkeddata#readme
@@ -9,9 +9,9 @@ maintainer:     matthias+hackage@remakingthe.world
 copyright:      (c) Matthias Pronk
 license:        BSD3
 license-file:   LICENSE
+category:       RDF
 build-type:     Simple
 cabal-version:  >= 1.10
-
 extra-source-files:
     ChangeLog.md
     README.md
@@ -23,6 +23,26 @@ source-repository head
 library
   hs-source-dirs:
       src
+  exposed-modules:
+      LinkedData
+    , LinkedData.Serialisation
+    , LinkedData.QQ
+  other-modules:
+      LinkedData.Format
+    , LinkedData.FromRDF
+    , LinkedData.ToRDF
+    , LinkedData.Graphs
+    , LinkedData.IRI
+    , LinkedData.Namespaces
+    , LinkedData.Query
+    , LinkedData.Serialisation.Common
+    , LinkedData.Serialisation.NTriplesParser
+    , LinkedData.Serialisation.NTriplesSerialiser
+    , LinkedData.Serialisation.Streaming
+    , LinkedData.Serialisation.TurtleParser
+    , LinkedData.Serialisation.TurtleSerialiser
+    , LinkedData.Types
+    , LinkedData.Utils
   build-depends:
       base >=4.7 && <5
     , attoparsec
@@ -31,6 +51,7 @@ library
     , containers
     , either
     , hashable
+    , mtl
     , parsers
     , QuickCheck
     , resourcet
@@ -40,24 +61,8 @@ library
     , streaming-bytestring
     , template-haskell
     , text
+    , time
     , transformers
-  exposed-modules:
-      LinkedData
-    , LinkedData.Types
-    , LinkedData.Serialisation
-    , LinkedData.QQ
-  other-modules:
-      LinkedData.FromRDF
-    , LinkedData.Graphs
-    , LinkedData.IRI
-    , LinkedData.Query
-    , LinkedData.Serialisation.Common
-    , LinkedData.Serialisation.NTriplesParser
-    , LinkedData.Serialisation.NTriplesSerialiser
-    , LinkedData.Serialisation.Streaming
-    , LinkedData.Serialisation.TurtleParser
-    , LinkedData.Serialisation.TurtleSerialiser
-    , LinkedData.Utils
   default-language: Haskell2010
   ghc-options: -Wall -Wmissing-export-lists
 
@@ -65,7 +70,9 @@ test-suite linkeddata-test
   type: exitcode-stdio-1.0
   main-is: Spec.hs
   other-modules:
-      LinkedData.CommonSpec
+      LinkedData.Common
+    , LinkedData.FormatSpec
+    , LinkedData.FromRDFSpec
     , LinkedData.IRISpec
     , LinkedData.NTriplesSpec
     , LinkedData.QuerySpec
@@ -81,18 +88,8 @@ test-suite linkeddata-test
     , filepath
     , directory
     , QuickCheck
+    , quickcheck-instances
     , streaming
+    , time
     , text
-  default-language: Haskell2010
-
-benchmark linkeddata-bench
-  main-is: Main.hs
-  hs-source-dirs: bench/speed
-  type: exitcode-stdio-1.0
-  build-depends:
-      base >= 4.7 && <5
-    , random
-    , criterion
-    , linkeddata
-  ghc-options: -Wall
   default-language: Haskell2010

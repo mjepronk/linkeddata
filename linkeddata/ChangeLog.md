@@ -1,4 +1,11 @@
-# Changelog for Linked Data
+# Changelog for `linkeddata`
+
+## 0.1.0.0
+
+- Added `ToRDF` and improved `FromRDF`.
+- Improved the basic query function `select`.
+- Improved the functionality to check if graphs are isomorphic.
+- Added `Namespaces` module which contains common prefixes and IRI's.
 
 ## 0.0.2.0
 

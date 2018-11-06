@@ -20,10 +20,14 @@ import           System.Directory (getCurrentDirectory)
 import           Test.Hspec
 import           Test.QuickCheck (property, withMaxSuccess)
 
-import           LinkedData (IRI, Graph(..), Triple(..), Term(..), (.:.), emptyGraphMeta, fromRDF, select, rdfNS, rdfsNS, mkAbsIRI)
+import           LinkedData (IRI, Graph(..), Triple(..), TriplePattern(..),
+                     Term(..), Var(..), (.:.), emptyGraphMeta, fromRDF, select,
+                     rdfNS, rdfsNS, mkAbsIRI)
 import           LinkedData.QQ (absiri, reliri)
-import           LinkedData.Serialisation (runResourceT, toGraph, fromGraph, toGraphWithMeta, parseNTriplesFile, parseTurtle, parseTurtleFile, serialiseTurtle)
-import           LinkedData.CommonSpec (shouldBeIsomorphicTo)
+import           LinkedData.Serialisation (runResourceT, toGraph, fromGraph,
+                     toGraphWithMeta, parseNTriplesFile, parseTurtle,
+                     parseTurtleFile, serialiseTurtle)
+import           LinkedData.Common (shouldBeIsomorphicTo)
 
 
 data TurtleTestCase = TurtleTestCase
@@ -45,7 +49,7 @@ parseTurtleTestFile fp = do
 getManifestPath :: IO FilePath
 getManifestPath = do
     cwd <- getCurrentDirectory
-    pure (cwd </> "test/w3c/turtle/manifest.ttl")
+    pure (cwd </> "../test/w3c/turtle/manifest.ttl")
 
 stripFileScheme :: FilePath -> FilePath
 stripFileScheme (stripPrefix "file://" -> Just rest) = rest
@@ -61,18 +65,18 @@ parseManifest path = do
         -- TODO: For now we only filter the tests of type rdft:TestTurtleEval,
         -- but we should also parse the other tests.
         -- However, we do not have the possibility yet to query optional values...
-        let test = Var "test"
-            name = Var "name"
+        let test    = Var "test"
+            name    = Var "name"
             comment = Var "comment"
-            action = Var "action"
-            result = Var "result"
+            action  = Var "action"
+            result  = Var "result"
             res = select g'
               [ name, comment, action, result ]
-              [ Triple test (ITerm $ rdfNS  .:. [reliri|type|]) (ITerm $ rdftNS .:. [reliri|TestTurtleEval|])
-              , Triple test (ITerm $ mfNS   .:. [reliri|name|]) name
-              , Triple test (ITerm $ rdfsNS .:. [reliri|comment|]) comment
-              , Triple test (ITerm $ mfNS   .:. [reliri|action|]) action
-              , Triple test (ITerm $ mfNS   .:. [reliri|result|]) result -- optional
+              [ TriplePattern (Left test) (Right . ITerm $ rdfNS  .:. [reliri|type|]) (Right . ITerm $ rdftNS .:. [reliri|TestTurtleEval|])
+              , TriplePattern (Left test) (Right . ITerm $ mfNS   .:. [reliri|name|]) (Left name)
+              , TriplePattern (Left test) (Right . ITerm $ rdfsNS .:. [reliri|comment|]) (Left comment)
+              , TriplePattern (Left test) (Right . ITerm $ mfNS   .:. [reliri|action|]) (Left action)
+              , TriplePattern (Left test) (Right . ITerm $ mfNS   .:. [reliri|result|]) (Left result) -- optional
               ]
         in  pure (mapMaybe resultToTC res)
       Left e -> fail $ "Error while parsing manifest " <> show path <> ": " <> show e

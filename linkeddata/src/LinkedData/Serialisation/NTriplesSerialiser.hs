@@ -53,7 +53,6 @@ renderTerm (BNode s)    = if "genid" `T.isPrefixOf` s
                             then "_:x" <> renderT s
                             else "_:" <> renderT s
 renderTerm (BNodeGen i) = "_:genid" <> B.decimal i
-renderTerm (Var _)      = "" -- fail "Can't serialize query variables!"
 
 renderLiteral :: LValue -> B.Builder
 renderLiteral (PlainL s)    = "\"" <> renderLiteralT s <> "\""

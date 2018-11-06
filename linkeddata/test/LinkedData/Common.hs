@@ -1,6 +1,8 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module LinkedData.CommonSpec where
+module LinkedData.Common
+  ( shouldBeIsomorphicTo )
+where
 
 import Control.Monad (join)
 import qualified Data.Text as T
@@ -8,7 +10,7 @@ import qualified Data.Text.Lazy as TL
 import qualified Streaming.Prelude as S
 import           Test.Hspec
 
-import           LinkedData.Types
+import           LinkedData (Graph, Triples)
 import qualified LinkedData as LD
 import           LinkedData.Serialisation
 

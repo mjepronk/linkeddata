@@ -1,14 +1,15 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes       #-}
 
-module LinkedData.IRISpec where
+module LinkedData.IRISpec
+  ( spec )
+where
 
 import           Control.Monad (forM_)
 import           Data.Maybe (fromJust)
 import qualified Data.Text as T
 import           Data.Monoid ((<>))
-import           LinkedData (IRI, Abs, Rel, Prefix(..), commonNamespaces)
-import           LinkedData (mkAbsIRI, mkRelIRI, unIRI, relativeTo, relativeFrom, findPrefix)
+import           LinkedData (IRI, Abs, Rel, Prefix(..), commonNamespaces, mkAbsIRI, mkRelIRI, unIRI, relativeTo, relativeFrom, findPrefix)
 import           LinkedData.QQ (absiri, reliri)
 import           Test.Hspec
 import           Test.QuickCheck (property, withMaxSuccess)
@@ -34,6 +35,13 @@ spec = describe "IRI" $ do
         it ("resolves '" <> T.unpack (unIRI r) <> "' to base '" <> T.unpack (unIRI b) <> "'") $
           (r `relativeFrom` b) `shouldBe` Just e)
     it "is consistent with relativeTo" $
+      -- TODO: This fails:
+      --       1) IRI.relativeFrom is consistent with relativeTo
+      --            Falsifiable (after 69 tests):
+      --              <https://forum.i2p/a/b/>
+      --              <https://forum.i2p/a/b/?q=ultimate+question#type>
+      --            expected: <https://forum.i2p/a/b/>
+      --             but got: <https://forum.i2p/a/b/?q=ultimate+question>
       withMaxSuccess 100 $ property (\a base ->
         let r  = fromJust $ a `relativeFrom` base
             a' = fromJust $ r `relativeTo` base
@@ -114,13 +122,6 @@ relativeFromTests =
   , ([absiri|http://a/b/c/|], [absiri|http://a/b/c/#s|],  [reliri|#s|])            -- hash only
   , ([absiri|http://a/b/|],   [absiri|http://a/b|],       [reliri|/b|])
   ]
-
-testRelativeTo :: T.Text -> T.Text -> T.Text -> Expectation
-testRelativeTo b r e =
-  let b' = fromJust $ mkAbsIRI b
-      r' = fromJust $ mkRelIRI r
-      e' = fromJust $ mkAbsIRI e
-  in  (r' `relativeTo` b') `shouldBe` Just e'
 
 prefixTests :: [(IRI Abs, Maybe (Prefix, IRI Rel))]
 prefixTests =
